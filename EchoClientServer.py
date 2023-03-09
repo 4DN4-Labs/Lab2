@@ -20,40 +20,49 @@ e.g., then do EchoClientserver.Server()
 import socket
 import argparse
 import sys
+import csv
+
 
 ########################################################################
 # Echo Server class
 ########################################################################
 
 class Server:
-
     # Set the server hostname used to define the server socket address
     # binding. Note that "0.0.0.0" or "" serves as INADDR_ANY. i.e.,
     # bind to all local network interfaces.
-    HOSTNAME = "0.0.0.0"      # All interfaces.
+    HOSTNAME = "0.0.0.0"  # All interfaces.
     # HOSTNAME = "192.168.1.22" # single interface
     # HOSTNAME = "hornet"       # valid hostname (mapped to address/IF)
     # HOSTNAME = "localhost"    # local host (mapped to local address/IF)
     # HOSTNAME = "127.0.0.1"    # same as localhost
-    
+
     # Server port to bind the listen socket.
     PORT = 50000
-    
-    RECV_BUFFER_SIZE = 1024 # Used for recv.
+
+    RECV_BUFFER_SIZE = 1024  # Used for recv.
     MAX_CONNECTION_BACKLOG = 10
 
     # We are sending text strings and the encoding to bytes must be
     # specified.
     # MSG_ENCODING = "ascii" # ASCII text encoding.
-    MSG_ENCODING = "utf-8" # Unicode text encoding.
+    MSG_ENCODING = "utf-8"  # Unicode text encoding.
 
     # Create server socket address. It is a tuple containing
     # address/hostname and port.
     SOCKET_ADDRESS = (HOSTNAME, PORT)
 
     def __init__(self):
+        self.read_csv()
         self.create_listen_socket()
         self.process_connections_forever()
+
+    def read_csv(self):
+        with open('course_grades_2023.csv', mode='r') as csv_file:
+            readline = csv.reader(csv_file)
+
+            for row in readline:
+                print(row)
 
     def create_listen_socket(self):
         try:
@@ -106,7 +115,7 @@ class Server:
                 # Receive bytes over the TCP connection. This will block
                 # until "at least 1 byte or more" is available.
                 recvd_bytes = connection.recv(Server.RECV_BUFFER_SIZE)
-            
+
                 # If recv returns with zero bytes, the other end of the
                 # TCP connection has closed (The other end is probably in
                 # FIN WAIT 2 and we are in CLOSE WAIT.). If so, close the
@@ -116,12 +125,13 @@ class Server:
                     print("Closing client connection ... ")
                     connection.close()
                     break
-                
+
+
                 # Decode the received bytes back into strings. Then output
                 # them.
                 recvd_str = recvd_bytes.decode(Server.MSG_ENCODING)
-                print("Received: ", recvd_str)
-                
+                print("Received " + recvd_str[8:] + " command from client")
+
                 # Send the received bytes back to the client. We are
                 # sending back the raw data.
                 connection.sendall(recvd_bytes)
@@ -133,29 +143,31 @@ class Server:
                 connection.close()
                 break
 
+
+
 ########################################################################
 # Echo Client class
 ########################################################################
 
 class Client:
-
     # Set the server to connect to. If the server and client are running
     # on the same machine, we can use the current hostname.
     # SERVER_HOSTNAME = socket.gethostname()
     # SERVER_HOSTNAME = "192.168.1.22"
     SERVER_HOSTNAME = "localhost"
-    
+
     # Try connecting to the compeng4dn4 echo server. You need to change
     # the destination port to 50007 in the connect function below.
     # SERVER_HOSTNAME = 'compeng4dn4.mooo.com'
 
     # RECV_BUFFER_SIZE = 5 # Used for recv.    
-    RECV_BUFFER_SIZE = 1024 # Used for recv.
+    # RECV_BUFFER_SIZE = 1024  # Used for recv.
+    RECV_BUFFER_SIZE = 1024
 
     def __init__(self):
         self.get_socket()
         self.connect_to_server()
-        self.send_console_input_forever()
+        self.get_ID_command()
 
     def get_socket(self):
         try:
@@ -166,7 +178,7 @@ class Client:
             self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             # Bind the client socket to a particular address/port.
             # self.socket.bind((Server.HOSTNAME, 40000))
-                
+
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -180,14 +192,18 @@ class Client:
             print(msg)
             sys.exit(1)
 
-    def get_console_input(self):
+    def get_console_input(self, input_message):
         # In this version we keep prompting the user until a non-blank
         # line is entered, i.e., ignore blank lines.
         while True:
-            self.input_text = input("Input: ")
+            # Get student ID and command
+            self.input_text = input(input_message)
             if self.input_text != "":
                 break
-    
+
+    def process_commands(self, cmd):
+        pass
+
     def send_console_input_forever(self):
         while True:
             try:
@@ -201,12 +217,42 @@ class Client:
                 # that we close the socket.
                 self.socket.close()
                 sys.exit(1)
-                
+
+    def get_ID_command(self):
+        try:
+            self.get_console_input('Please enter your ID number followed by a command: ')
+            ID_command = self.connection_send()
+            command = ID_command[8:]
+            print('Command entered: ' + command)
+            if command == 'GMA':
+                print('Getting midterm average...')
+            elif command == 'GL1A':
+                print('Getting lab 1 average...')
+            elif command == 'GL2A':
+                print('Getting lab 2 average...')
+            elif command == 'GL3A':
+                print('Getting lab 3 average...')
+            elif command == 'GL4A':
+                print('Getting lab 4 average...')
+            elif command == 'GEA':
+                print('Getting exam average...')
+            elif command == 'GG':
+                print('Getting grades...')
+
+        except (KeyboardInterrupt, EOFError):
+            print()
+            print("Closing server connection ...")
+            # If we get and error or keyboard interrupt, make sure
+            # that we close the socket.
+            self.socket.close()
+            sys.exit(1)
+
     def connection_send(self):
         try:
             # Send string objects over the connection. The string must
             # be encoded into bytes objects first.
             self.socket.sendall(self.input_text.encode(Server.MSG_ENCODING))
+            return self.input_text
         except Exception as msg:
             print(msg)
             sys.exit(1)
@@ -226,11 +272,12 @@ class Client:
                 self.socket.close()
                 sys.exit(1)
 
-            print("Received: ", recvd_bytes.decode(Server.MSG_ENCODING))
+            return recvd_bytes.decode(Server.MSG_ENCODING)
 
         except Exception as msg:
             print(msg)
             sys.exit(1)
+
 
 ########################################################################
 # Process command line arguments if this module is run directly.
@@ -242,11 +289,11 @@ class Client:
 # then __name__ will be set to that module's name.
 
 if __name__ == '__main__':
-    roles = {'client': Client,'server': Server}
+    roles = {'client': Client, 'server': Server}
     parser = argparse.ArgumentParser()
 
     parser.add_argument('-r', '--role',
-                        choices=roles, 
+                        choices=roles,
                         help='server or client role',
                         required=True, type=str)
 
@@ -254,9 +301,3 @@ if __name__ == '__main__':
     roles[args.role]()
 
 ########################################################################
-
-
-
-
-
-
