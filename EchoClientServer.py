@@ -22,6 +22,7 @@ import argparse
 import sys
 import csv
 import pandas as pd
+import json
 from cryptography.fernet import Fernet
 
 
@@ -118,6 +119,7 @@ class Server:
             'GL3A': 'Lab 3',
             'GL4A': 'Lab 4',
             'GMA': 'Midterm',
+            'GEA': ['Exam 1', 'Exam 2', 'Exam 3', 'Exam 4']
         }
 
         # encryption_keys = {
@@ -153,8 +155,37 @@ class Server:
                     for row in read_line:
                         if ID_number in row:
                             print("User found")
-                            # print(row_num)
-                            if command in columns:
+                            if command == "GG":
+                                print("Command found")
+                                df = pd.read_csv('course_grades_2023.csv')
+                                student_grades = {
+                                    "Student Name: ": row[0],
+                                    "Student ID: ": int(row[1]),
+                                    "Lab 1: ": int(row[3]),
+                                    "Lab 2: ": int(row[4]),
+                                    "Lab 3: ": int(row[5]),
+                                    "Lab 4: ": int(row[6]),
+                                    "Midterm: ": int(row[7]),
+                                    "Exam 1: ": int(row[8]),
+                                    "Exam 2: ": int(row[9]),
+                                    "Exam 3: ": int(row[10]),
+                                    "Exam 4: ": int(row[11]),
+                                }
+                                
+                                message_send = "The requested student's grades are: \n" + json.dumps(student_grades)
+                            elif command == "GEA":
+                                print("Command found")
+                                # Reading CSV file into a DataFrame
+                                df = pd.read_csv('course_grades_2023.csv')
+                                
+                                exam_avg = 0
+                                for exam in columns[command]:
+                                    exam_avg += df[exam].mean()
+                                
+                                all_exam_avg = exam_avg/len(columns[command])
+
+                                message_send = "Exam Average: " + str(all_exam_avg)
+                            elif command in columns:
                                 print("Command found")
                                 # Reading CSV file into a DataFrame
                                 df = pd.read_csv('course_grades_2023.csv')
@@ -164,21 +195,27 @@ class Server:
                                 # # Debug print
                                 # print(col_avg)
 
-                                message_send = columns[command] + " : " + str(col_avg)
-                                # encode message
-                                message_bytes = message_send.encode('utf-8')
+                                message_send = columns[command] + " Average : " + str(col_avg)
+                            else:
+                                print("Command not found. Closing Connection.")
+                                connection.close()
+                                break
+                         
+                            # encode message
+                            message_bytes = message_send.encode('utf-8')
 
-                                encryption_key = df.loc[row_num - 1, 'Key']
-                                # # Debug print
-                                # print(encryption_key)
-                                encryption_key_bytes = encryption_key.encode('utf-8')
+                            encryption_key = df.loc[row_num - 1, 'Key']
+                            # # Debug print
+                            # print(encryption_key)
+                            encryption_key_bytes = encryption_key.encode('utf-8')
 
-                                # Encrypt the message for transmission at the server
-                                fernet = Fernet(encryption_key_bytes)
-                                encrypted_message_bytes = fernet.encrypt(message_bytes)
-                                connection.sendall(encrypted_message_bytes)
-                                print("Sent encrypted message: ", encrypted_message_bytes)
+                            # Encrypt the message for transmission at the server
+                            fernet = Fernet(encryption_key_bytes)
+                            encrypted_message_bytes = fernet.encrypt(message_bytes)
+                            connection.sendall(encrypted_message_bytes)
+                            print("Sent encrypted message: ", encrypted_message_bytes)
                         row_num = row_num + 1
+            
 
             except KeyboardInterrupt:
                 print()
@@ -311,6 +348,9 @@ class Client:
                     print('Getting exam average...')
                 elif command == 'GG':
                     print('Getting grades...')
+                else:
+                    print("Command not found. Closing connection.")
+                    self.socket.close()
 
                 encrypted_message_bytes = self.connection_receive()
                 print("Got encrypted message: " + encrypted_message_bytes)
