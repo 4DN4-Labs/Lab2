@@ -197,9 +197,7 @@ class Server:
 
                                 message_send = columns[command] + " Average : " + str(col_avg)
                             else:
-                                print("Command not found. Closing Connection.")
-                                connection.close()
-                                break
+                                print("Command not found. Please try again.")
                          
                             # encode message
                             message_bytes = message_send.encode('utf-8')
@@ -333,6 +331,11 @@ class Client:
                 ID_command = self.connection_send()
                 ID = ID_command[:7]
                 command = ID_command[8:]
+                
+                if ID not in encryption_key:
+                    print("Student ID not found. Please try again.")
+                    continue
+                
                 print('Command entered: ' + command)
                 if command == 'GMA':
                     print('Getting midterm average...')
@@ -349,8 +352,8 @@ class Client:
                 elif command == 'GG':
                     print('Getting grades...')
                 else:
-                    print("Command not found. Closing connection.")
-                    self.socket.close()
+                    print(command + " is not a valid command. Please try again from one of the following commands: GG, GEA, GMA, GL1A, GL2A, GL3A, GL4A.")
+                    continue
 
                 encrypted_message_bytes = self.connection_receive()
                 print("Got encrypted message: " + encrypted_message_bytes)
